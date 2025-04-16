@@ -1,0 +1,28 @@
+{
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "properties": {
+          "pais": "Costa Rica",
+          "nombre": "Tienda A"
+        },
+        "geometry": {
+          "type": "Point",
+          "coordinates": [-84.1, 9.93]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "pais": "Guatemala",
+          "nombre": "Tienda B"
+        },
+        "geometry": {
+          "type": "Point",
+          "coordinates": [-90.5, 14.6]
+        }
+      }
+    ]
+  }
+  
