@@ -1,115 +1,76 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <title>Mapa con Filtro por País</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
-    <style>
-        #map {
-            height: 600px;
-        }
-        .filter-container {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            z-index: 1000;
-            background: white;
-            padding: 8px;
-            border-radius: 5px;
-            font-family: sans-serif;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Mapa filtrable por país</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link 
+    rel="stylesheet" 
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+  />
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    #map { height: 90vh; }
+  </style>
 </head>
 <body>
+  <h3>Filtrar por país:</h3>
+  <select id="paisSelect">
+    <option value="todos">Todos</option>
+  </select>
+  <div id="map"></div>
 
-<div class="filter-container">
-    <label for="paisSelect">Filtrar por país:</label>
-    <select id="paisSelect">
-        <option value="all">Todos</option>
-    </select>
-</div>
-
-<div id="map"></div>
-
-<!-- Leaflet JS -->
-<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
-
-<script>
-    // Inicializar el mapa
-    const map = L.map('map').setView([13.5, -85.0], 5); // Centroamérica
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([9.1, -79.4], 6);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 18,
-        attribution: '&copy; OpenStreetMap'
+      attribution: '© OpenStreetMap'
     }).addTo(map);
 
     let geojsonLayer;
-    let allData;
+    let datosOriginales;
 
-    const paisSelect = document.getElementById("paisSelect");
+    fetch('puntos.geojson') // <- asegúrate de subir este archivo junto a index.html
+      .then(res => res.json())
+      .then(data => {
+        datosOriginales = data;
+        poblarFiltro(data);
+        renderizarGeojson(data);
+      });
 
-    // Cargar datos GeoJSON
-    fetch('puntos.geojson') // Asegúrate que este archivo esté en el mismo directorio
-        .then(response => response.json())
-        .then(data => {
-            allData = data;
-
-            // Extraer lista única de países
-            const paises = [...new Set(data.features.map(f => f.properties.pais))];
-            paises.sort().forEach(pais => {
-                const option = document.createElement("option");
-                option.value = pais;
-                option.textContent = pais;
-                paisSelect.appendChild(option);
-            });
-
-            // Mostrar todos al inicio
-            mostrarDatos(data);
-        });
-
-    // Función para mostrar datos filtrados
-    function mostrarDatos(geojsonData) {
-        if (geojsonLayer) {
-            geojsonLayer.remove();
-        }
-
-        geojsonLayer = L.geoJSON(geojsonData, {
-            onEachFeature: function(feature, layer) {
-                const nombre = feature.properties.nombre || "Sin nombre";
-                const pais = feature.properties.pais || "Desconocido";
-                layer.bindPopup(`<strong>${nombre}</strong><br>País: ${pais}`);
-            },
-            pointToLayer: function(feature, latlng) {
-                return L.circleMarker(latlng, {
-                    radius: 6,
-                    fillColor: "#3388ff",
-                    color: "#000",
-                    weight: 1,
-                    opacity: 1,
-                    fillOpacity: 0.8
-                });
-            }
-        }).addTo(map);
+    function poblarFiltro(data) {
+      const paises = new Set();
+      data.features.forEach(f => paises.add(f.properties.pais));
+      const select = document.getElementById('paisSelect');
+      paises.forEach(p => {
+        const option = document.createElement('option');
+        option.value = p;
+        option.text = p;
+        select.appendChild(option);
+      });
+      select.addEventListener('change', aplicarFiltro);
     }
 
-    // Filtrar al cambiar selección
-    paisSelect.addEventListener("change", () => {
-        const seleccionado = paisSelect.value;
+    function aplicarFiltro() {
+      const valor = document.getElementById('paisSelect').value;
+      const filtrados = (valor === 'todos')
+        ? datosOriginales
+        : {
+            ...datosOriginales,
+            features: datosOriginales.features.filter(f => f.properties.pais === valor)
+          };
+      renderizarGeojson(filtrados);
+    }
 
-        if (seleccionado === "all") {
-            mostrarDatos(allData);
-        } else {
-            const filtrado = {
-                ...allData,
-                features: allData.features.filter(f => f.properties.pais === seleccionado)
-            };
-            mostrarDatos(filtrado);
+    function renderizarGeojson(data) {
+      if (geojsonLayer) geojsonLayer.remove();
+      geojsonLayer = L.geoJSON(data, {
+        onEachFeature: function (feature, layer) {
+          layer.bindPopup(feature.properties.pais || "Sin nombre");
         }
-    });
-</script>
-
+      }).addTo(map);
+    }
+  </script>
 </body>
 </html>
