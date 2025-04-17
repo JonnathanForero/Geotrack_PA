@@ -2,27 +2,25 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Mapa filtrable por país</title>
+  <title>Mapa filtrable por corregimiento y COD_fid</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link 
-    rel="stylesheet" 
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
-  />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     body { margin: 0; font-family: sans-serif; }
     #map { height: 90vh; }
   </style>
 </head>
 <body>
-  <h3>Filtrar por país:</h3>
-  <select id="paisSelect">
+  <h3>Filtrar por corregimiento:</h3>
+  <select id="corregimientoSelect">
     <option value="todos">Todos</option>
   </select>
-  <!-- 🔍 Aquí agregamos el buscador por ID -->
-  <h4>Buscar por ID:</h4>
-  <input type="number" id="idBuscar" placeholder="Buscar por ID">
-  <button onclick="buscarPorID()">Buscar</button>
-  <div id="map" style="height: 500px;"></div>
+
+  <h4>Buscar por COD_fid:</h4>
+  <input type="text" id="buscarCOD_fid" placeholder="Buscar por COD_fid">
+  <button onclick="buscarPorCOD_fid()">Buscar</button>
+
+  <div id="map" style="height: 700px;"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
@@ -32,72 +30,166 @@
       attribution: '© OpenStreetMap'
     }).addTo(map);
 
-    let geojsonLayer;
-    let datosOriginales;
+    let capaPuntos; // Capa de los puntos
+    let capaPoligonos; // Capa de los polígonos
+    let datosPuntosLB; // Datos de los puntos
+    let datosPoligonos; // Datos de los polígonos
 
-    fetch('puntos2.geojson') // <- asegúrate de subir este archivo junto a index.html
+    // Cargar puntos desde 'puntosLB.geojson'
+    fetch('puntosLB.geojson')
       .then(res => res.json())
       .then(data => {
-        datosOriginales = data;
-        poblarFiltro(data);
-        renderizarGeojson(data);
+        datosPuntosLB = data; // Guardamos los datos originales de los puntos
+        renderizarPuntosLB(data); // Función que dibuja los puntos
       });
 
-    function poblarFiltro(data) {
-      const paises = new Set();
-      data.features.forEach(f => paises.add(f.properties.pais));
-      const select = document.getElementById('paisSelect');
-      paises.forEach(p => {
-        const option = document.createElement('option');
-        option.value = p;
-        option.text = p;
-        select.appendChild(option);
+    // Cargar polígono desde 'poligonos_geoweb.json'
+    fetch('poligonos_geoweb.geojson')
+      .then(res => res.json())
+      .then(data => {
+        datosPoligonos = data; // Guardamos los datos de los polígonos
+        poblarFiltro(data); // Poblar el filtro por corregimiento
+        renderizarPoligonos(data); // Función que dibuja los polígonos
       });
-      select.addEventListener('change', aplicarFiltro);
-    }
 
-    function aplicarFiltro() {
-      const valor = document.getElementById('paisSelect').value;
-      const filtrados = (valor === 'todos')
-        ? datosOriginales
-        : {
-            ...datosOriginales,
-            features: datosOriginales.features.filter(f => f.properties.pais === valor)
-          };
-      renderizarGeojson(filtrados);
-    }
-
-    function renderizarGeojson(data) {
-      if (geojsonLayer) geojsonLayer.remove();
-      geojsonLayer = L.geoJSON(data, {
+    // Función para renderizar los puntos
+    function renderizarPuntosLB(data) {
+      if (capaPuntos) capaPuntos.remove(); // Si ya hay puntos, los eliminamos
+      capaPuntos = L.geoJSON(data, {
+        pointToLayer: function (feature, latlng) {
+          return L.circleMarker(latlng, {
+            radius: 6,
+            fillColor: 'red',
+            color: '#fff',
+            weight: 1,
+            opacity: 1,
+            fillOpacity: 0.8
+          });
+        },
         onEachFeature: function (feature, layer) {
-          layer.bindPopup(feature.properties.pais || "Sin nombre");
+          const props = feature.properties;
+          layer.bindPopup(`<b>ID:</b> ${props.id || '-'}<br><b>Corregimiento:</b> ${props.Corregimie || '-'}<br><b>Código:</b> ${props.COD_fid || '-'}`);
         }
       }).addTo(map);
     }
-    function buscarPorID() {
-      
-      const idBuscado = document.getElementById('idBuscar').value.trim();
-      if (!idBuscado) return;
 
-      const encontrado = datosOriginales.features.find(f => f.properties.id === Number(idBuscado));
+    // Función para renderizar los polígonos
+    function renderizarPoligonos(data) {
+      if (capaPoligonos) capaPoligonos.remove(); // Eliminar capa existente de polígonos si existe
+      capaPoligonos = L.geoJSON(data, {
+        style: function () {
+          return {
+            color: "blue", // Color inicial
+            weight: 2,
+            opacity: 0.6
+          };
+        },
+        onEachFeature: function (feature, layer) {
+          layer.bindPopup(`<b>Corregimiento:</b> ${feature.properties.Corregimie}<br><b>Código:</b> ${feature.properties.COD_fid || '-'}`);
+        }
+      }).addTo(map);
+    }
 
-      if (encontrado) {
-        const coords = encontrado.geometry.coordinates;
+    // Función para poblar el filtro por corregimiento y ordenarlo
+    function poblarFiltro(data) {
+      const corregimientos = new Set();
+      data.features.forEach(f => corregimientos.add(f.properties.Corregimie));
+
+      // Convertir el Set a un array y ordenarlo alfabéticamente
+      const corregimientosOrdenados = Array.from(corregimientos).sort();
+
+      const select = document.getElementById('corregimientoSelect');
+      corregimientosOrdenados.forEach(c => {
+        const option = document.createElement('option');
+        option.value = c;
+        option.text = c;
+        select.appendChild(option);
+      });
+
+      select.addEventListener('change', aplicarFiltro);
+    }
+
+    // Función para aplicar el filtro
+    function aplicarFiltro() {
+      const valor = document.getElementById('corregimientoSelect').value;
+
+      // Filtrar polígonos
+      const filtradosPoligonos = (valor === 'todos')
+        ? datosPoligonos
+        : {
+            ...datosPoligonos,
+            features: datosPoligonos.features.filter(f => f.properties.Corregimie === valor)
+          };
+      renderizarPoligonos(filtradosPoligonos);
+
+      // Filtrar puntos
+      const filtradosPuntos = (valor === 'todos')
+        ? datosPuntosLB
+        : {
+            ...datosPuntosLB,
+            features: datosPuntosLB.features.filter(f => f.properties.Corregimie === valor)
+          };
+      renderizarPuntosLB(filtradosPuntos);
+    }
+
+    // Función para buscar por COD_fid
+    function buscarPorCOD_fid() {
+      const COD_fidBuscado = document.getElementById('buscarCOD_fid').value.trim();
+      if (!COD_fidBuscado) return;
+
+      // Buscar en los puntos
+      const encontradoPuntos = datosPuntosLB.features.find(f => f.properties.COD_fid === COD_fidBuscado);
+      if (encontradoPuntos) {
+        const coords = encontradoPuntos.geometry.coordinates;
         const latlng = [coords[1], coords[0]]; // GeoJSON es [lng, lat], Leaflet usa [lat, lng]
 
         map.setView(latlng, 14); // zoom al nivel 14
 
-        // Crear popup temporal
+        // Crear popup temporal para los puntos
         L.popup()
           .setLatLng(latlng)
-          .setContent(`<b>ID:</b> ${encontrado.properties.id}<br><b>País:</b> ${encontrado.properties.pais}`)
+          .setContent(`<b>ID:</b> ${encontradoPuntos.properties.id || '-'}<br><b>Corregimiento:</b> ${encontradoPuntos.properties.Corregimie || '-'}<br><b>Código:</b> ${COD_fidBuscado}`)
           .openOn(map);
+      }
+
+      // Buscar en los polígonos
+      const encontradoPoligono = datosPoligonos.features.find(f => f.properties.COD_fid === COD_fidBuscado);
+      if (encontradoPoligono) {
+        // Obtener el centro del polígono (usaremos el centroide del polígono)
+        const latlng = getCentroidePoligono(encontradoPoligono);
+
+        map.setView(latlng, 14); // zoom al nivel 14
+
+        // Cambiar color del polígono encontrado
+        const poligonoLayer = capaPoligonos.getLayers().find(layer => layer.feature.properties.COD_fid === COD_fidBuscado);
+        if (poligonoLayer) {
+          poligonoLayer.setStyle({ color: 'green' }); // Cambiar color a verde
+        }
+
+        // Crear popup temporal para el polígono
+        L.popup()
+          .setLatLng(latlng)
+          .setContent(`<b>Corregimiento:</b> ${encontradoPoligono.properties.Corregimie}<br><b>Código:</b> ${COD_fidBuscado}`)
+          .openOn(map);
+
+        // Restaurar color del polígono después de 3 segundos
+        setTimeout(() => {
+          if (poligonoLayer) {
+            poligonoLayer.setStyle({ color: 'blue' }); // Restaurar color original
+          }
+        }, 5000); // Cambiar de vuelta a azul después de 3 segundos
       } else {
-        alert("No se encontró el ID");
+        alert("No se encontró el COD_fid");
       }
     }
 
+    // Función para obtener el centro de un polígono (centroide)
+    function getCentroidePoligono(poligono) {
+      const coords = poligono.geometry.coordinates[0]; // Suponemos que el polígono tiene una sola geometría exterior (sin agujeros)
+      const latlngs = coords.map(coord => [coord[1], coord[0]]);
+      const latlngCentroide = L.latLngBounds(latlngs).getCenter(); // Obtener el centroide usando Leaflet
+      return latlngCentroide;
+    }
 
   </script>
 </body>
