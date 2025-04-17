@@ -18,7 +18,11 @@
   <select id="paisSelect">
     <option value="todos">Todos</option>
   </select>
-  <div id="map"></div>
+  <!-- 🔍 Aquí agregamos el buscador por ID -->
+  <h4>Buscar por ID:</h4>
+  <input type="number" id="idBuscar" placeholder="Buscar por ID">
+  <button onclick="buscarPorID()">Buscar</button>
+  <div id="map" style="height: 500px;"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
@@ -31,7 +35,7 @@
     let geojsonLayer;
     let datosOriginales;
 
-    fetch('puntos.geojson') // <- asegúrate de subir este archivo junto a index.html
+    fetch('puntos2.geojson') // <- asegúrate de subir este archivo junto a index.html
       .then(res => res.json())
       .then(data => {
         datosOriginales = data;
@@ -71,6 +75,30 @@
         }
       }).addTo(map);
     }
+    function buscarPorID() {
+      
+      const idBuscado = document.getElementById('idBuscar').value.trim();
+      if (!idBuscado) return;
+
+      const encontrado = datosOriginales.features.find(f => f.properties.id === Number(idBuscado));
+
+      if (encontrado) {
+        const coords = encontrado.geometry.coordinates;
+        const latlng = [coords[1], coords[0]]; // GeoJSON es [lng, lat], Leaflet usa [lat, lng]
+
+        map.setView(latlng, 14); // zoom al nivel 14
+
+        // Crear popup temporal
+        L.popup()
+          .setLatLng(latlng)
+          .setContent(`<b>ID:</b> ${encontrado.properties.id}<br><b>País:</b> ${encontrado.properties.pais}`)
+          .openOn(map);
+      } else {
+        alert("No se encontró el ID");
+      }
+    }
+
+
   </script>
 </body>
 </html>
